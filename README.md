@@ -7,7 +7,7 @@ The main item currently in this repository is the vmlp.py file: A python version
 python 2.7 and numpy 
 
 # Constructor parameters: 
-```vmlp (<numpy matrix of input data>, <numpy matrix of corresponding labels>, <numpy vector of hidden layer neurons>, <learning_rate>, <# of iteration>)```
+```vmlp (<numpy matrix of input data>, <numpy matrix of corresponding labels>, <vector of hidden layer neurons>, <learning_rate>, <# of iteration>)```
 
 # Example Usage 
 ```
@@ -17,7 +17,7 @@ from vmlp import vmlp
 data = numpy.matrix([[0,0],[0,1],[1,0],[1,1]]) # xor dataset input data
 labels = numpy.matrix([[0],[1],[1],[0]]) # xor dataset labels
 
-user_model = vmlp(data, labels, [2], 0.1, 4000) 
+user_model = vmlp(data, labels, [2], 0.1, 4000) # alternative example: user_model = vmlp(data, labels, [2, 5, 69, 2], 0.1, 4000) this is to illustrate the usage of the hidden layer neuron count parameter
 user_model.train() # this trains the model 
 user_model.faTest(data, labels) # performs function approximation test on the provided data
 user_model.patregTest(data, labels) # performs a pattern recognition test on the provided data
