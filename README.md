@@ -7,9 +7,10 @@ The main item currently in this repository is the vmlp.py file: A python version
 python 2.7 and numpy 
 
 # Constructor parameters: 
-vmlp (<numpy matrix of input data>, <numpy matrix of corresponding labels>, <numpy vector of hidden layer neurons>, <learning_rate>, <# of iteration>)
+```vmlp (<numpy matrix of input data>, <numpy matrix of corresponding labels>, <numpy vector of hidden layer neurons>, <learning_rate>, <# of iteration>)```
 
 # Example Usage 
+```
 ...
 from vmlp import vmlp
 ...
@@ -20,5 +21,5 @@ user_model = vmlp(data, labels, [2], 0.1, 4000)
 user_model.train() # this trains the model 
 user_model.faTest(data, labels) # performs function approximation test on the provided data
 user_model.patregTest(data, labels) # performs a pattern recognition test on the provided data
-
-Access the predicted labels through user_model.predictedLabels() and the error rate through user_model.error_rate after testing.
+```
+Access the predicted labels through ```user_model.predictedLabels()``` and the error rate through ```user_model.error_rate``` after testing.
