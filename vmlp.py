@@ -113,7 +113,7 @@ class vmlp(object):
         return sigdevfunc(x)
 
     def sigmoidDerivative(self, x):
-        return x * (1 - x);
+        return x * (1 - x)
 
     def numpySigmoid(self, x):
         sigfunc = numpy.vectorize(self.sigmoid)
