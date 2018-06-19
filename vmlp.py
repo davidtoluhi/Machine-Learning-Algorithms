@@ -1,5 +1,11 @@
 import numpy
 import math
+'''
+VMLP: Vectorised Multilayer Perceptron 
+    a neuron is represented as a vector; 
+    a the neural network is represented as an array of arrays of vectors
+    
+'''
 class vmlp(object):
     # tensorflow or scikit learn?
     # you could also use clustering or k-means
