@@ -3,8 +3,9 @@ import math
 '''
 VMLP: Vectorised Multilayer Perceptron 
     a neuron is represented as a vector; 
-    a the neural network is represented as an array of arrays of vectors
-    
+    a the neural network is represented as an array of a matrix of vectors
+    this helps making the training process faster;
+    todo: use MinPy to leverage GPU support 
 '''
 class vmlp(object):
     # tensorflow or scikit learn?
@@ -25,7 +26,7 @@ class vmlp(object):
     error_rate = 1
 
     """docstring forvmlp."""
-    def __init__(self, data, labels, hidden_layer_nodes_list_rep, learning_rate, iterations):
+    def __init__(self, data, labels, hidden_layer_nodes_list_rep, learning_rate, iterations, weight_range):
         super(vmlp, self).__init__()
         # self.arg = arg
         self.input_layer_neuron_count = data.shape[1]
@@ -35,6 +36,7 @@ class vmlp(object):
         self.raw_labels = numpy.zeros(labels.shape[0])
         self.learning_rate = learning_rate
         self.iterations = iterations
+        
         if sum(hidden_layer_nodes_list_rep) > 0:
             self.layer_count = len(hidden_layer_nodes_list_rep) + 1 # none for input layer and one for output layer
             self.layer_neuron_count = [self.input_layer_neuron_count] + hidden_layer_nodes_list_rep + [1] #output neuron
@@ -43,6 +45,7 @@ class vmlp(object):
 
         for i in range(0, self.layer_count):
             # numpy.random.random(rows, cols)
+            # initializing weights of vectors/neurons
             layer_neurons = numpy.matrix( numpy.random.random((self.layer_neuron_count[i+1], self.layer_neuron_count[i]+1)))
             self.neurons.append(layer_neurons)
             self.weight_updates.append(layer_neurons)
