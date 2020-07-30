@@ -19,7 +19,7 @@ class vmlp(object):
     learning_rate = 0.1
     iterations = 1000
     layer_outputs = []
-    layer_deltas = []
+    layer_gradients = []
     weight_updates = []
     predicted_labels = []
     raw_labels = []
@@ -27,7 +27,7 @@ class vmlp(object):
 
     """docstring forvmlp."""
     # labels should be a matrix 
-    def __init__(self, data, labels, hidden_layer_nodes_list_rep, learning_rate, iterations, weight_range, use_softmax=False, use_numbers=False, logit_layer_node_count=0):
+    def __init__(self, data, labels, hidden_layer_nodes_list_rep, learning_rate, iterations, use_softmax=False, use_numbers=False, logit_layer_node_count=0):
         super(vmlp, self).__init__()
         self.input_layer_neuron_count = data.shape[1]
         self.data = data
@@ -35,6 +35,7 @@ class vmlp(object):
         self.learning_rate = learning_rate
         self.iterations = iterations
         self.use_softmax = use_softmax
+        self.has_embedded_layer = False
 
         if use_numbers: 
             self.labels = numpy.zeros([labels.shape[0], self.input_layer_neuron_count])
@@ -71,53 +72,81 @@ class vmlp(object):
             )
             self.neurons.append(layer_neurons)
             self.weight_updates.append(layer_neurons)
+        
+    def embedLayer(self, embedded_layer): 
+        self.embedded_layer = embedded_layer 
+        self.has_embedded_layer = True 
       
-    def feedForward(self, input_):
+    def set_weight_range(weight_range):
+        self.weightRangeIsSet = True 
+        self.weight_range = weight_range
+
+    def feedForward(self, sample):
         self.layer_outputs = []
-        self.layer_outputs.append(input_)
+        self.layer_outputs.append(sample)
 
         for layer in range(0, self.layer_count):
-            inp = numpy.c_[self.layer_outputs[layer], 1]
-            self.layer_outputs.append(self.numpySigmoid(inp * self.neurons[layer].T))
+            biased_sample = numpy.c_[self.layer_outputs[layer], 1]
+            self.layer_outputs.append(self.numpySigmoid(biased_sample * self.neurons[layer].T))
         
-    def feedForwardSoftmax(self, input_):
+    def feedForwardSoftmax(self, sample):
         self.layer_outputs = []
-        self.layer_outputs.append(input_)
+        self.layer_outputs.append(sample)
 
-        for layer in range(0, self.layer_count):
-            inp = numpy.c_[self.layer_outputs[layer], 1] # add a 1 to the input for the bias value
+        start_idx = 0 
+        if self.has_embedded_layer: 
+            start_idx = 1
+            sparse_sample = sample[:self.embedded_layer.target_low_dimension]
+            regular_sample = sample[self.embedded_layer.target_low_dimension:]
+            self.layer_outputs.append(self.embedded_layer.feedForward(sparse_sample, regular_sample))
+
+        for layer in range(start_idx, self.layer_count):
+            biased_sample = numpy.c_[self.layer_outputs[layer], 1] # add a 1 to the input for the bias value
             if layer == layer_count: 
-                self.layer_outputs.append(self.softmax(inp * self.neurons[layer].T))
+                self.layer_outputs.append(self.softmax(biased_sample * self.neurons[layer].T))
             else:
-                self.layer_outputs.append(self.numpySigmoid(inp * self.neurons[layer].T))
+                self.layer_outputs.append(self.numpySigmoid(biased_sample * self.neurons[layer].T))
         
 
-    def backpropInput(self, label):
+    def backpropInput(self, label, sample):
         net_activation = self.layer_outputs[self.layer_count] # because it includes the input layer
         training_err = label - net_activation
         output_delta = training_err
-        self.layer_deltas = []
-        self.layer_deltas.append(output_delta)
+        self.layer_gradients = []
+        self.layer_gradients.append(output_delta)
 
         # still correct for multiclass 
         output_delta_w = self.learning_rate * output_delta * numpy.c_[self.layer_outputs[self.layer_count-1], 1]
-        for i in range(self.layer_count, 1, -1):
-           
-            self.layer_deltas.insert(
+
+        stop_idx = 0 
+        if self.has_embedded_layer: 
+            stop_idx = 1
+
+        for layer in range(self.layer_count-1, stop_idx, -1):
+            
+            self.layer_gradients.insert(
                 0, # input it in position 0 because we're iterating backwards in terms of layers 
                 numpy.multiply(
-                    self.numpySigDeriv(self.layer_outputs[i-1].T) , 
+                    self.numpySigDeriv(self.layer_outputs[layer].T) , 
                     (
-                        self.layer_deltas[0].T * self.neurons[i-1][:,0:self.layer_neuron_count[i-1]] # similar to Pytorch's grad fn 
+                        self.layer_gradients[0].T * self.neurons[layer][:,0:self.layer_neuron_count[layer]] # similar to Pytorch's grad fn 
                     ).T
                 )
             ) # bias
 
-            # in softmax, we don't multiply by input
-            # delta_w = self.learning_rate * self.layer_deltas[0] * numpy.ones(self.layer_neuron_count[i-2]+1)#* numpy.c_[self.layer_outputs[i-2], 1]
-            delta_w = self.learning_rate * self.layer_deltas[0] * numpy.c_[self.layer_outputs[i-2], 1]
-            self.neurons[i-2] =  delta_w + self.neurons[i-2]
-
+            delta_w = self.learning_rate * self.layer_gradients[0] * numpy.c_[self.layer_outputs[layer-1], 1]
+            self.neurons[layer-1] =  delta_w + self.neurons[layer-1]
+            
+        if self.has_embedded_layer: 
+            sparse_sample = sample[:self.embedded_layer.target_low_dimension]
+            regular_sample = sample[self.embedded_layer.target_low_dimension:]
+            self.embedded_layer.backProp(
+                self.layer_gradients[0], 
+                self.neurons[1][:,0:self.layer_neuron_count[1]], # cuz neurons 1 are already updated on line 134
+                sparse_sample,
+                regular_sample
+            )
+            
         self.neurons[self.layer_count-1] = self.neurons[self.layer_count-1] + output_delta_w
 
         
@@ -125,18 +154,18 @@ class vmlp(object):
     def train(self):
         if self.use_softmax:
             for x in range(0, self.iterations):
-                for y in range(0, self.data.shape[0]):
+                for sample_idx in range(0, self.data.shape[0]):
             
-                    input_ = self.data[y, :]
-                    self.feedForwardSoftmax(input_)
-                    self.backpropInput(self.labels[y])
+                    sample = self.data[sample_idx, :]
+                    self.feedForwardSoftmax(sample)
+                    self.backpropInput(self.labels[sample_idx], sample)
         else: 
             for x in range(0, self.iterations):
-                for y in range(0, self.data.shape[0]):
+                for sample_idx in range(0, self.data.shape[0]):
             
-                    input_ = self.data[y, :]
-                    self.feedForward(input_)
-                    self.backpropInput(self.labels[y])
+                    sample = self.data[sample_idx, :]
+                    self.feedForward(sample)
+                    self.backpropInput(self.labels[sample_idx], sample)
         
         
 

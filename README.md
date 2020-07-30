@@ -4,7 +4,7 @@ A repository for a personal implementation of machine learning algorithms.......
 The main item currently in this repository is the vmlp.py file: A python version of a neural network I created in matlab, what's great about it is that you can just create a a neural net by providing a vector consisting of the amount of neurons in each layer(except the output) of the neural net 
 
 # Requirements 
-python 2.7 and numpy 
+python 2.7 or 3 and numpy 
 
 # Example Usage for one hot encoding
 ## Constructor parameters: 

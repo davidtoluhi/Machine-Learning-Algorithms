@@ -52,7 +52,7 @@ class vmlp(object):
     def set_weight_range(weight_range):
         self.weightRangeIsSet = True 
         self.weight_range = weight_range
-        
+
     def feedForward(self, input_):
         self.layer_outputs = []
         self.layer_outputs.append(input_)
@@ -83,17 +83,7 @@ class vmlp(object):
 
             delta_w = self.learning_rate * self.layer_gradients[0] * numpy.c_[self.layer_outputs[i-1], 1]
             self.neurons[i-1] =  delta_w + self.neurons[i-1]
-        
-        # inital_layer_gradient = numpy.multiply(
-        #     self.numpySigDeriv(self.layer_outputs[0].T) , 
-        #     (
-        #         self.layer_gradients[0].T * self.neurons[0][:,0:self.layer_neuron_count[0]] 
-        #     ).T
-        # )
-
-        # inital_layer_delta_w = self.learning_rate * inital_layer_gradient * numpy.c_[sample, 1]
-
-        # self.neurons[0] = self.neurons[0] + inital_layer_delta_w
+      
         self.neurons[self.layer_count-1] = self.neurons[self.layer_count-1] + output_delta_w
 
         
