@@ -27,17 +27,33 @@ class vmlp(object):
 
     """docstring forvmlp."""
     # labels should be a matrix 
-    def __init__(self, data, labels, hidden_layer_nodes_list_rep, learning_rate, iterations, weight_range, use_softmax=False):
+    def __init__(self, data, labels, hidden_layer_nodes_list_rep, learning_rate, iterations, weight_range, use_softmax=False, use_numbers=False, logit_layer_node_count=0):
         super(vmlp, self).__init__()
         self.input_layer_neuron_count = data.shape[1]
         self.data = data
-        self.labels = labels
         self.predicted_labels = numpy.zeros(labels.shape[0])
-        self.raw_labels = numpy.zeros(labels.shape[0])
         self.learning_rate = learning_rate
         self.iterations = iterations
         self.use_softmax = use_softmax
-        self.logit_layer_node_count = labels.shape[1] 
+
+        if use_numbers: 
+            self.labels = numpy.zeros([labels.shape[0], self.input_layer_neuron_count])
+            if sum(hidden_layer_nodes_list_rep) > 0:
+                self.labels = numpy.zeros([labels.shape[0], self.hidden_layer_nodes_list_rep[len(self.hidden_layer_nodes_list_rep)-1])
+            self.logit_layer_node_count = logit_layer_node_count
+
+            if sum(hidden_layer_nodes_list_rep) > 0:
+                self.labels = numpy.zeros([labels.shape[0], self.hidden_layer_nodes_list_rep[len(self.hidden_layer_nodes_list_rep)-1])
+            
+            for label_idx in range(0, logit_layer_node_count):
+                self.labels[label_idx, labels[label_idx]] = 1
+
+            self.logit_layer_node_count = logit_layer_node_count
+        else:
+            self.labels = labels
+            self.logit_layer_node_count = labels.shape[1] 
+
+        self.raw_labels = numpy.zeros(labels.shape)
 
         if sum(hidden_layer_nodes_list_rep) > 0:
             self.layer_count = len(hidden_layer_nodes_list_rep) + 1 # none for input layer and one for output layer
@@ -219,7 +235,7 @@ class vmlp(object):
             activation=numpy.argmax(self.raw_labels[i])
 
             self.predicted_labels[i]=activation
-            
+
             if activation != numpy.argmax(labels[i]):
                 error = error+1
             self.error_rate = error/data.shape[0]
