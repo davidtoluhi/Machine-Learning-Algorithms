@@ -19,14 +19,14 @@ class vmlp(object):
     learning_rate = 0.1
     iterations = 1000
     layer_outputs = []
-    layer_deltas = []
+    layer_gradients = []
     weight_updates = []
     predicted_labels = []
     raw_labels = []
     error_rate = 1
 
     """docstring forvmlp."""
-    def __init__(self, data, labels, hidden_layer_nodes_list_rep, learning_rate, iterations, weight_range):
+    def __init__(self, data, labels, hidden_layer_nodes_list_rep, learning_rate, iterations, weight_range=[0,2]):
         super(vmlp, self).__init__()
         # self.arg = arg
         self.input_layer_neuron_count = data.shape[1]
@@ -49,6 +49,10 @@ class vmlp(object):
             self.neurons.append(layer_neurons)
             self.weight_updates.append(layer_neurons)
 
+    def set_weight_range(weight_range):
+        self.weightRangeIsSet = True 
+        self.weight_range = weight_range
+        
     def feedForward(self, input_):
         self.layer_outputs = []
         self.layer_outputs.append(input_)
@@ -57,29 +61,39 @@ class vmlp(object):
             self.layer_outputs.append(self.numpySigmoid(inp * self.neurons[layer].T))
         
 
-    def backpropInput(self, label):
+    def backpropInput(self, label, sample):
         net_activation = self.layer_outputs[self.layer_count][0,0] # because it includes the input layer
         training_err = label - net_activation
         output_delta = training_err
-        self.layer_deltas = []
-        self.layer_deltas.append(output_delta)
+        self.layer_gradients = []
+        self.layer_gradients.append(output_delta)
 
         output_delta_w = self.learning_rate * output_delta * numpy.c_[self.layer_outputs[self.layer_count-1], 1]
-        for i in range(self.layer_count, 1, -1):
+        for i in range(self.layer_count-1, 0, -1):
 
-            self.layer_deltas.insert(
+            self.layer_gradients.insert(
                 0, # input it in position 0 because we're iterating backwards in terms of layers 
                 numpy.multiply(
-                    self.numpySigDeriv(self.layer_outputs[i-1].T) , 
+                    self.numpySigDeriv(self.layer_outputs[i].T) , 
                     (
-                        self.layer_deltas[0].T * self.neurons[i-1][:,0:self.layer_neuron_count[i-1]] # similar to Pytorch's grad fn 
+                        self.layer_gradients[0].T * self.neurons[i][:,0:self.layer_neuron_count[i]] 
                     ).T
                 )
-            ) # bias
+            ) 
 
-            delta_w = self.learning_rate * self.layer_deltas[0] * numpy.c_[self.layer_outputs[i-2], 1]
-            self.neurons[i-2] =  delta_w + self.neurons[i-2]
+            delta_w = self.learning_rate * self.layer_gradients[0] * numpy.c_[self.layer_outputs[i-1], 1]
+            self.neurons[i-1] =  delta_w + self.neurons[i-1]
+        
+        # inital_layer_gradient = numpy.multiply(
+        #     self.numpySigDeriv(self.layer_outputs[0].T) , 
+        #     (
+        #         self.layer_gradients[0].T * self.neurons[0][:,0:self.layer_neuron_count[0]] 
+        #     ).T
+        # )
 
+        # inital_layer_delta_w = self.learning_rate * inital_layer_gradient * numpy.c_[sample, 1]
+
+        # self.neurons[0] = self.neurons[0] + inital_layer_delta_w
         self.neurons[self.layer_count-1] = self.neurons[self.layer_count-1] + output_delta_w
 
         
@@ -88,9 +102,9 @@ class vmlp(object):
 
         for x in range(0, self.iterations):
             for y in range(0, self.data.shape[0]):
-                input_ = self.data[y, :]
-                self.feedForward(input_)
-                self.backpropInput(self.labels[y])
+                sample = self.data[y, :]
+                self.feedForward(sample)
+                self.backpropInput(self.labels[y], sample)
         
 
     def numpySigDeriv(self, x):
@@ -143,8 +157,8 @@ class vmlp(object):
 #
 # data = numpy.matrix([[0,0],[0,1],[1,0],[1,1]])
 # labels = numpy.matrix([[0],[1],[1],[0]])
-#
+
 # # problem is the difference in sigmoid prediction
-# neural_net = vmlp(data, labels, [2], 0.1, 4000)
+# neural_net = vmlp(data, labels, [2,2], 0.1, 7000)
 # neural_net.train()
 # neural_net.predictedLabels()
