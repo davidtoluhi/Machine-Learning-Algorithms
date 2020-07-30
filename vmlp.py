@@ -56,7 +56,7 @@ class vmlp(object):
     def feedForward(self, input_):
         self.layer_outputs = []
         self.layer_outputs.append(input_)
-        for z in range(0, self.layer_count):
+        for layer in range(0, self.layer_count):
             # if z == self.layer_count-1:
             #     self.layer_outputs[i+1] = self.layer_outputs[z] * self.neurons[z].T# i+1 because we want the input layer untouched
             # else:
@@ -64,9 +64,9 @@ class vmlp(object):
             # v = np.ones((10, 1))
             # c = np.c_[m, v]
 
-            inp = numpy.c_[self.layer_outputs[z], 1]
-            self.layer_outputs.append(self.numpySigmoid(inp * self.neurons[z].T))
-        pass
+            inp = numpy.c_[self.layer_outputs[layer], 1]
+            self.layer_outputs.append(self.numpySigmoid(inp * self.neurons[layer].T))
+        
 
     def backpropInput(self, label):
         net_activation = self.layer_outputs[self.layer_count][0,0] # because it includes the input layer
@@ -74,6 +74,7 @@ class vmlp(object):
         output_delta = training_err
         self.layer_deltas = []
         self.layer_deltas.append(output_delta)
+
         output_delta_w = self.learning_rate * output_delta * numpy.c_[self.layer_outputs[self.layer_count-1], 1]
         # output_delta_w = self.learning_rate * output_delta * self.layer_outputs[self.layer_count-1]
         # print (output_delta_w)
@@ -86,7 +87,15 @@ class vmlp(object):
             # print((self.neurons[i-1][:,0:self.layer_neuron_count[i-1]]).T)
             # print((self.layer_deltas[0][0,0] * self.neurons[i-1][:,0:self.layer_neuron_count[i-1]]).T)
 
-            self.layer_deltas.insert(0, numpy.multiply(self.numpySigDeriv(self.layer_outputs[i-1].T) , (self.layer_deltas[0].T * self.neurons[i-1][:,0:self.layer_neuron_count[i-1]]).T)) # bias
+            self.layer_deltas.insert(
+                0, # input it in position 0 because we're iterating backwards in terms of layers 
+                numpy.multiply(
+                    self.numpySigDeriv(self.layer_outputs[i-1].T) , 
+                    (
+                        self.layer_deltas[0].T * self.neurons[i-1][:,0:self.layer_neuron_count[i-1]] # similar to Pytorch's grad fn 
+                    ).T
+                )
+            ) # bias
 
             # print(self.layer_deltas[0])
 
@@ -103,7 +112,7 @@ class vmlp(object):
 
         self.neurons[self.layer_count-1] = self.neurons[self.layer_count-1] + output_delta_w
 
-        pass
+        
 
     def train(self):
 
@@ -115,7 +124,7 @@ class vmlp(object):
                 input_ = self.data[y, :]
                 self.feedForward(input_)
                 self.backpropInput(self.labels[y])
-        pass
+        
 
     def numpySigDeriv(self, x):
         sigdevfunc = numpy.vectorize(self.sigmoidDerivative)
@@ -139,7 +148,7 @@ class vmlp(object):
             # print(self.layer_outputs[self.layer_count][0,0])
         self.patregTest(self.data, self.labels)
         print(self.raw_labels)
-        pass
+        
 
     def predict(self, input_vector):
         self.feedForward(input_vector)
@@ -152,8 +161,8 @@ class vmlp(object):
             self.raw_labels[i] = self.predict(data[i,:])
             error = error + (labels[i] - self.raw_labels[i])**2
         result = math.sqrt(error/data.shape[0])
-        self.error_rate=result;
-        return result;
+        self.error_rate=result
+        return result
 
     def patregTest(self, data, labels):
         error=0
