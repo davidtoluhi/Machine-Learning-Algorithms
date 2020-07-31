@@ -148,10 +148,10 @@ class vmlp(object):
         return error/data.shape[0]
 
 #
-# data = numpy.matrix([[0,0],[0,1],[1,0],[1,1]])
-# labels = numpy.matrix([[0],[1],[1],[0]])
+data = numpy.matrix([[0,2],[20,12],[91,70],[11,1]])
+labels = numpy.matrix([[0],[1],[1],[0]])
 
-# # problem is the difference in sigmoid prediction
-# neural_net = vmlp(data, labels, [2], 0.1, 9000)
-# neural_net.train()
-# neural_net.predictedLabels()
+# problem is the difference in sigmoid prediction
+neural_net = vmlp(data, labels, [2], 0.1, 9000)
+neural_net.train()
+neural_net.predictedLabels()
