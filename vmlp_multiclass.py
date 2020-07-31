@@ -1,4 +1,5 @@
 import numpy
+from scipy.special import expit, softmax
 import math
 '''
 VMLP: Vectorised Multilayer Perceptron 
@@ -27,7 +28,7 @@ class vmlp(object):
 
     """docstring forvmlp."""
     # labels should be a matrix 
-    def __init__(self, data, labels, hidden_layer_nodes_list_rep, learning_rate, iterations, use_softmax=False, use_numbers=False, logit_layer_node_count=0):
+    def __init__(self, data, labels, hidden_layer_nodes_list_rep, learning_rate, iterations, use_softmax=True, use_numbers=False, logit_layer_node_count=0):
         super(vmlp, self).__init__()
         self.input_layer_neuron_count = data.shape[1]
         self.data = data
@@ -40,12 +41,9 @@ class vmlp(object):
         if use_numbers: 
             self.labels = numpy.zeros([labels.shape[0], self.input_layer_neuron_count])
             if sum(hidden_layer_nodes_list_rep) > 0:
-                self.labels = numpy.zeros([labels.shape[0], self.hidden_layer_nodes_list_rep[len(self.hidden_layer_nodes_list_rep)-1])
+                self.labels = numpy.zeros([labels.shape[0], self.hidden_layer_nodes_list_rep[len(self.hidden_layer_nodes_list_rep)-1]])
             self.logit_layer_node_count = logit_layer_node_count
 
-            if sum(hidden_layer_nodes_list_rep) > 0:
-                self.labels = numpy.zeros([labels.shape[0], self.hidden_layer_nodes_list_rep[len(self.hidden_layer_nodes_list_rep)-1])
-            
             for label_idx in range(0, logit_layer_node_count):
                 self.labels[label_idx, labels[label_idx]] = 1
 
@@ -102,7 +100,8 @@ class vmlp(object):
 
         for layer in range(start_idx, self.layer_count):
             biased_sample = numpy.c_[self.layer_outputs[layer], 1] # add a 1 to the input for the bias value
-            if layer == layer_count: 
+            if layer == self.layer_count-1: 
+                # print(self.softmax(biased_sample * self.neurons[layer].T))
                 self.layer_outputs.append(self.softmax(biased_sample * self.neurons[layer].T))
             else:
                 self.layer_outputs.append(self.numpySigmoid(biased_sample * self.neurons[layer].T))
@@ -110,13 +109,13 @@ class vmlp(object):
 
     def backpropInput(self, label, sample):
         net_activation = self.layer_outputs[self.layer_count] # because it includes the input layer
-        training_err = label - net_activation
+        training_err = net_activation - label
         output_delta = training_err
         self.layer_gradients = []
-        self.layer_gradients.append(output_delta)
+        self.layer_gradients.append(output_delta.T)
 
         # still correct for multiclass 
-        output_delta_w = self.learning_rate * output_delta * numpy.c_[self.layer_outputs[self.layer_count-1], 1]
+        output_delta_w = self.learning_rate * output_delta.T * numpy.c_[self.layer_outputs[self.layer_count-1], 1]
 
         stop_idx = 0 
         if self.has_embedded_layer: 
@@ -129,11 +128,12 @@ class vmlp(object):
                 numpy.multiply(
                     self.numpySigDeriv(self.layer_outputs[layer].T) , 
                     (
-                        self.layer_gradients[0].T * self.neurons[layer][:,0:self.layer_neuron_count[layer]] # similar to Pytorch's grad fn 
+                        self.layer_gradients[0].T *  self.neurons[layer][:,0:self.layer_neuron_count[layer]]# similar to Pytorch's grad fn 
                     ).T
                 )
             ) # bias
 
+            # print(self.layer_gradients[0])
             delta_w = self.learning_rate * self.layer_gradients[0] * numpy.c_[self.layer_outputs[layer-1], 1]
             self.neurons[layer-1] =  delta_w + self.neurons[layer-1]
             
@@ -175,6 +175,9 @@ class vmlp(object):
 
         return x * (1 - x)
 
+    def sigmoidDerivative(self, x):
+        return x * (1 - x)
+
     def numpySigmoid(self, x):
         sigfunc = numpy.vectorize(self.sigmoid)
         return sigfunc(x)
@@ -206,6 +209,30 @@ class vmlp(object):
     def softmaxGradient(self, logit_output, label_vector): 
         return logit_output - label_vector
 
+    def vectorizedSoftmax(self, x):
+        softfunc = numpy.vectorize(self.softmax)
+        return softfunc(x)
+    
+    def logSumOfExponents(self, x):
+        '''
+        public static double logSumOfExponentials(double[] xs) {
+            if (xs.length == 1) return xs[0];
+            double max = maximum(xs);
+            double sum = 0.0;
+            for (int i = 0; i < xs.length; ++i)
+                if (xs[i] != Double.NEGATIVE_INFINITY)
+                    sum += java.lang.Math.exp(xs[i] - max);
+            return max + java.lang.Math.log(sum);
+        }
+        '''
+        maximum = numpy.max(x)
+        _sum = 0.0
+        for index, val in numpy.ndenumerate(x):
+            if val != -math.inf: 
+                _sum += numpy.exp(val - maximum)
+        return maximum + numpy.log(_sum)
+        # y =  numpy.exp(x) / (numpy.exp(x)).sum()
+
     def softmax(self, x):
         """Compute softmax values for each sets of scores in x."""
         '''
@@ -234,8 +261,17 @@ class vmlp(object):
         A single picture of a digit has only one true identity - the picture cannot be a 7 and an 8 at the same time.
             
         '''
+        # y = numpy.matrix([[1.0,2.0,7.0,5.0]])
+        # print(numpy.array(x))
+        # print('r')
+        # print(numpy.exp(x))
+        # print('e')
+        # print((numpy.exp(x)).sum())
+        # print('s')
+        e_x = numpy.exp(x - numpy.max(x))
+        y = e_x / e_x.sum()
+        return e_x / e_x.sum()
 
-        return numpy.exp(x) / numpy.sum(numpyp.exp(x), axis=0) 
      
     def predictedLabels(self):
         self.patregTest(self.data, self.labels)

@@ -33,7 +33,7 @@ class EmbeddedLayer(object):
         layer_gradient = numpy.multiply(
             self.numpySigDeriv(self.layer_outputs), 
             (
-                next_layer_deltas.T * self.next_layer_neurons[:,0:next_layer_neurons.shape[0]]
+                next_layer_deltas * self.next_layer_neurons[:,0:next_layer_neurons.shape[0]]
             ).T
         )
 
