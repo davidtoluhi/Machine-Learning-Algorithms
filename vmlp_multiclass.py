@@ -109,13 +109,29 @@ class vmlp(object):
 
     def backpropInput(self, label, sample):
         net_activation = self.layer_outputs[self.layer_count] # because it includes the input layer
+        # print('activation')
+        # print(net_activation)
         training_err = net_activation - label
+        # print('label')
+        # print(label)
+        # print('err')
+        # print(training_err)
         output_delta = training_err
         self.layer_gradients = []
-        self.layer_gradients.append(output_delta.T)
+        # node_grad = self.activation.grad(self.y)
+        # node_grad = node_grad * output_delta
+        output_layer_gradient = numpy.multiply(self.softmaxGradient(self.layer_outputs[self.layer_count]), output_delta.T) #
+        self.layer_gradients.append(output_layer_gradient)
 
+        # self.layer_gradients.append(output_delta.T)
+        # print('r')
+        # print(self.softmaxGradient(self.layer_outputs[self.layer_count]))
+        # print('e')
+        # print(output_delta)
+        # print('a')
+        # print(output_layer_gradient)
         # still correct for multiclass 
-        output_delta_w = self.learning_rate * output_delta.T * numpy.c_[self.layer_outputs[self.layer_count-1], 1]
+        output_delta_w = self.learning_rate * output_layer_gradient * numpy.c_[self.layer_outputs[self.layer_count-1], 1]
 
         stop_idx = 0 
         if self.has_embedded_layer: 
@@ -206,8 +222,23 @@ class vmlp(object):
     def crossEntropyLossDerivative(self, logit_output, label_vector):
         return logit_output - label_vector
 
-    def softmaxGradient(self, logit_output, label_vector): 
-        return logit_output - label_vector
+    def softmaxGradient(self, logit_output): 
+        # diagonal_m = numpy.diagflat(logit_output)
+
+        # # vectorized 
+        # s = diagonal_m.reshape(-1,1)
+        # y = numpy.diagflat(s) - numpy.dot(s, s.T)
+        # return y 
+        s = numpy.diagflat(logit_output) - numpy.dot(logit_output, logit_output.T)
+        return s.sum(axis=0).reshape(-1, 1)
+        
+    #     for row in range(len(diagonal_m)):
+    #         for column in range(len(diagonal_m)):
+    #             if i == j:
+    #                 diagonal_m[row][column] = logit_output[row] * (1-logit_output[row])
+    #             else: 
+    #                 diagonal_m[row][column] = -logit_output[row]*logit_output[column]
+    #    return logit_output
 
     def vectorizedSoftmax(self, x):
         softfunc = numpy.vectorize(self.softmax)
@@ -270,7 +301,8 @@ class vmlp(object):
         # print('s')
         e_x = numpy.exp(x - numpy.max(x))
         y = e_x / e_x.sum()
-        return e_x / e_x.sum()
+        print(y)
+        return y
 
      
     def predictedLabels(self):
