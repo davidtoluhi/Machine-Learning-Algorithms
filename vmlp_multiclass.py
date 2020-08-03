@@ -32,11 +32,12 @@ class vmlp(object):
         super(vmlp, self).__init__()
         self.input_layer_neuron_count = data.shape[1]
         self.data = data
-        self.predicted_labels = numpy.zeros(labels.shape[0])
+        self.predicted_labels = numpy.zeros(labels.shape)
         self.learning_rate = learning_rate
         self.iterations = iterations
         self.use_softmax = use_softmax
         self.has_embedded_layer = False
+        self.hidden_layer_nodes_list_rep = hidden_layer_nodes_list_rep
 
         if use_numbers: 
             self.labels = numpy.zeros([labels.shape[0], self.input_layer_neuron_count])
@@ -74,6 +75,24 @@ class vmlp(object):
     def embedLayer(self, embedded_layer): 
         self.embedded_layer = embedded_layer 
         self.has_embedded_layer = True 
+        self.neurons = [] 
+
+        if sum(self.hidden_layer_nodes_list_rep) > 0:
+            self.layer_count = len(self.hidden_layer_nodes_list_rep) + 2 # none for input layer, one for embedded, and one for output layer
+            self.layer_neuron_count = [self.input_layer_neuron_count] + [self.embedded_layer.total_neurons_in_layer] + self.hidden_layer_nodes_list_rep + [self.logit_layer_node_count ] #output logit
+        else:
+            self.layer_neuron_count = [self.input_layer_neuron_count] + [self.embedded_layer.total_neurons_in_layer] + [self.input_layer_neuron_count] +[self.logit_layer_node_count ]
+
+        for layer in range(0, self.layer_count):
+            # initializing weights of vectors/neurons
+            layer_neurons = numpy.matrix( 
+                numpy.random.random(
+                    (self.layer_neuron_count[layer+1], # number of neurons in this layer
+                    self.layer_neuron_count[layer]+1) # weights for the neurons in this layer: number of neurons in previous layer plus a bias 
+                )
+            )
+            self.neurons.append(layer_neurons)
+            self.weight_updates.append(layer_neurons)
       
     def set_weight_range(weight_range):
         self.weightRangeIsSet = True 
@@ -94,14 +113,15 @@ class vmlp(object):
         start_idx = 0 
         if self.has_embedded_layer: 
             start_idx = 1
-            sparse_sample = sample[:self.embedded_layer.target_low_dimension]
-            regular_sample = sample[self.embedded_layer.target_low_dimension:]
+            sparse_sample = sample[0,:self.embedded_layer.sparse_input_length]
+            regular_sample = sample[0,self.embedded_layer.sparse_input_length:]
+            
+        
             self.layer_outputs.append(self.embedded_layer.feedForward(sparse_sample, regular_sample))
 
         for layer in range(start_idx, self.layer_count):
             biased_sample = numpy.c_[self.layer_outputs[layer], 1] # add a 1 to the input for the bias value
             if layer == self.layer_count-1: 
-                # print(self.softmax(biased_sample * self.neurons[layer].T))
                 self.layer_outputs.append(self.softmax(biased_sample * self.neurons[layer].T))
             else:
                 self.layer_outputs.append(self.numpySigmoid(biased_sample * self.neurons[layer].T))
@@ -109,27 +129,12 @@ class vmlp(object):
 
     def backpropInput(self, label, sample):
         net_activation = self.layer_outputs[self.layer_count] # because it includes the input layer
-        # print('activation')
-        # print(net_activation)
         training_err = net_activation - label
-        # print('label')
-        # print(label)
-        # print('err')
-        # print(training_err)
         output_delta = training_err
         self.layer_gradients = []
-        # node_grad = self.activation.grad(self.y)
-        # node_grad = node_grad * output_delta
         output_layer_gradient = numpy.multiply(self.softmaxGradient(self.layer_outputs[self.layer_count]), output_delta.T) #
         self.layer_gradients.append(output_layer_gradient)
 
-        # self.layer_gradients.append(output_delta.T)
-        # print('r')
-        # print(self.softmaxGradient(self.layer_outputs[self.layer_count]))
-        # print('e')
-        # print(output_delta)
-        # print('a')
-        # print(output_layer_gradient)
         # still correct for multiclass 
         output_delta_w = self.learning_rate * output_layer_gradient * numpy.c_[self.layer_outputs[self.layer_count-1], 1]
 
@@ -149,18 +154,18 @@ class vmlp(object):
                 )
             ) # bias
 
-            # print(self.layer_gradients[0])
             delta_w = self.learning_rate * self.layer_gradients[0] * numpy.c_[self.layer_outputs[layer-1], 1]
             self.neurons[layer-1] =  delta_w + self.neurons[layer-1]
             
         if self.has_embedded_layer: 
-            sparse_sample = sample[:self.embedded_layer.target_low_dimension]
-            regular_sample = sample[self.embedded_layer.target_low_dimension:]
+            sparse_sample = sample[0,:self.embedded_layer.sparse_input_length]
+            regular_sample = sample[0,self.embedded_layer.sparse_input_length:]
             self.embedded_layer.backProp(
                 self.layer_gradients[0], 
                 self.neurons[1][:,0:self.layer_neuron_count[1]], # cuz neurons 1 are already updated on line 134
                 sparse_sample,
-                regular_sample
+                regular_sample, 
+                self.learning_rate
             )
             
         self.neurons[self.layer_count-1] = self.neurons[self.layer_count-1] + output_delta_w
@@ -171,7 +176,7 @@ class vmlp(object):
         if self.use_softmax:
             for x in range(0, self.iterations):
                 for sample_idx in range(0, self.data.shape[0]):
-            
+                    
                     sample = self.data[sample_idx, :]
                     self.feedForwardSoftmax(sample)
                     self.backpropInput(self.labels[sample_idx], sample)
@@ -292,13 +297,6 @@ class vmlp(object):
         A single picture of a digit has only one true identity - the picture cannot be a 7 and an 8 at the same time.
             
         '''
-        # y = numpy.matrix([[1.0,2.0,7.0,5.0]])
-        # print(numpy.array(x))
-        # print('r')
-        # print(numpy.exp(x))
-        # print('e')
-        # print((numpy.exp(x)).sum())
-        # print('s')
         e_x = numpy.exp(x - numpy.max(x))
         y = e_x / e_x.sum()
         print(y)
@@ -306,15 +304,16 @@ class vmlp(object):
 
      
     def predictedLabels(self):
-        self.patregTest(self.data, self.labels)
+        self.patregTest()
         print(self.raw_labels)
+        print(self.predicted_labels)
            
     def predict(self, input_vector):
         if self.use_softmax:
             self.feedForwardSoftmax(input_vector)
         else: 
             self.feedForward(input_vector)
-        return self.layer_outputs[self.layer_count][0,0]
+        return self.layer_outputs[self.layer_count]
 
     def faTest(self, data, labels):
         error=0
@@ -325,18 +324,20 @@ class vmlp(object):
         self.error_rate=result
         return result
 
-    def patregTest(self, data, labels):
+    def patregTest(self):
         error=0
-        for i in range(0, data.shape[0]):
-            self.raw_labels[i]=self.predict(data[i,:])
+        label_vector_size = self.labels.shape[1]
+        for i in range(0, self.data.shape[0]):
+            self.raw_labels[i]=self.predict(self.data[i,:])
             activation=numpy.argmax(self.raw_labels[i])
+            predicted_label = numpy.zeros(label_vector_size)
+            predicted_label[activation] = 1
+            self.predicted_labels[i]=predicted_label
 
-            self.predicted_labels[i]=activation
-
-            if activation != numpy.argmax(labels[i]):
+            if activation != numpy.argmax(self.labels[i]):
                 error = error+1
-            self.error_rate = error/data.shape[0]
-        return error/data.shape[0]
+            self.error_rate = error/self.data.shape[0]
+        return error/self.data.shape[0]
 
 #
 # data = numpy.matrix([[0,0],[0,1],[1,0],[1,1]])
